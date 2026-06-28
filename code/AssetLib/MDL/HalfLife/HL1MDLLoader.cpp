@@ -356,8 +356,8 @@ void HL1MDLLoader::read_texture(const Texture_HL1 *ptexture,
 
 // ------------------------------------------------------------------------------------------------
 void HL1MDLLoader::read_textures() {
-    scene_->mTextures = new aiTexture *[texture_header_->numtextures];
-    scene_->mMaterials = new aiMaterial *[texture_header_->numtextures];
+    scene_->mTextures = new aiTexture *[texture_header_->numtextures]();
+    scene_->mMaterials = new aiMaterial *[texture_header_->numtextures]();
 
     const Texture_HL1 *ptexture = get_texture_buffer_data<Texture_HL1>(texture_header_->textureindex, texture_header_->numtextures);
 
@@ -469,6 +469,12 @@ void HL1MDLLoader::read_bones() {
             bone_node->mParent = bones_node;
             roots.push_back(i); // This bone has no parent. Add it to the roots list.
         } else {
+            // pbone[i].parent is read straight from the file; reject indices
+            // outside the bone table (temp_bones_ has header_->numbones entries)
+            // to avoid an out-of-bounds access. -1 ("no parent") is handled above.
+            if (pbone[i].parent < 0 || pbone[i].parent >= header_->numbones) {
+                throw DeadlyImportError("HL1 MDL: bone references an out-of-range parent index");
+            }
             bone_node->mParent = temp_bones_[pbone[i].parent].node;
             temp_bones_[pbone[i].parent].children.push_back(i); // Add this bone to the parent bone's children list.
 
@@ -482,7 +488,7 @@ void HL1MDLLoader::read_bones() {
 
     // Allocate memory for each MDL root bone.
     bones_node->mNumChildren = static_cast<unsigned int>(roots.size());
-    bones_node->mChildren = new aiNode *[bones_node->mNumChildren];
+    bones_node->mChildren = new aiNode *[bones_node->mNumChildren]();
 
     // Build all bones children hierarchy starting from each MDL root bone.
     for (size_t i = 0; i < roots.size(); ++i)
@@ -500,7 +506,7 @@ void HL1MDLLoader::build_bone_children_hierarchy(const TempBone &bone)
 
     aiNode* bone_node = bone.node;
     bone_node->mNumChildren = static_cast<unsigned int>(bone.children.size());
-    bone_node->mChildren = new aiNode *[bone_node->mNumChildren];
+    bone_node->mChildren = new aiNode *[bone_node->mNumChildren]();
 
     // Build each child bone's hierarchy recursively.
     for (size_t i = 0; i < bone.children.size(); ++i)
@@ -631,7 +637,7 @@ void HL1MDLLoader::read_meshes() {
 
     unsigned int mesh_index = 0;
 
-    scene_->mMeshes = new aiMesh *[scene_->mNumMeshes];
+    scene_->mMeshes = new aiMesh *[scene_->mNumMeshes]();
 
     pbodypart = get_buffer_data<Bodypart_HL1>(header_->bodypartindex, header_->numbodyparts);
 
@@ -652,7 +658,7 @@ void HL1MDLLoader::read_meshes() {
     aiNode *bodyparts_node = new aiNode(AI_MDL_HL1_NODE_BODYPARTS);
     rootnode_children_.push_back(bodyparts_node);
     bodyparts_node->mNumChildren = static_cast<unsigned int>(header_->numbodyparts);
-    bodyparts_node->mChildren = new aiNode *[bodyparts_node->mNumChildren];
+    bodyparts_node->mChildren = new aiNode *[bodyparts_node->mNumChildren]();
     aiNode **bodyparts_node_ptr = bodyparts_node->mChildren;
 
     // The following variables are defined here so they don't have
@@ -726,7 +732,7 @@ void HL1MDLLoader::read_meshes() {
         bodypart_node->mMetaData->Set(0, "Base", pbodypart->base);
 
         bodypart_node->mNumChildren = static_cast<unsigned int>(pbodypart->nummodels);
-        bodypart_node->mChildren = new aiNode *[bodypart_node->mNumChildren];
+        bodypart_node->mChildren = new aiNode *[bodypart_node->mNumChildren]();
         aiNode **bodypart_models_ptr = bodypart_node->mChildren;
 
         for (int j = 0; j < pbodypart->nummodels;
@@ -900,7 +906,7 @@ void HL1MDLLoader::read_meshes() {
 
                     // Add mesh bones.
                     scene_mesh->mNumBones = static_cast<unsigned int>(bone_triverts.size());
-                    scene_mesh->mBones = new aiBone *[scene_mesh->mNumBones];
+                    scene_mesh->mBones = new aiBone *[scene_mesh->mNumBones]();
 
                     aiBone **scene_bone_ptr = scene_mesh->mBones;
 
@@ -1051,7 +1057,7 @@ void HL1MDLLoader::read_sequence_groups_info() {
     rootnode_children_.push_back(sequence_groups_node);
 
     sequence_groups_node->mNumChildren = static_cast<unsigned int>(header_->numseqgroups);
-    sequence_groups_node->mChildren = new aiNode *[sequence_groups_node->mNumChildren];
+    sequence_groups_node->mChildren = new aiNode *[sequence_groups_node->mNumChildren]();
 
     const SequenceGroup_HL1 *pseqgroup = get_buffer_data<SequenceGroup_HL1>(header_->seqgroupindex, header_->numseqgroups);
 
@@ -1091,7 +1097,7 @@ void HL1MDLLoader::read_sequence_infos() {
     rootnode_children_.push_back(sequence_infos_node);
 
     sequence_infos_node->mNumChildren = static_cast<unsigned int>(header_->numseq);
-    sequence_infos_node->mChildren = new aiNode *[sequence_infos_node->mNumChildren];
+    sequence_infos_node->mChildren = new aiNode *[sequence_infos_node->mNumChildren]();
 
     std::vector<aiNode *> sequence_info_node_children;
 
@@ -1134,7 +1140,7 @@ void HL1MDLLoader::read_sequence_infos() {
                 sequence_info_node_children.push_back(blend_controllers_node);
                 blend_controllers_node->mParent = sequence_info_node;
                 blend_controllers_node->mNumChildren = static_cast<unsigned int>(num_blend_controllers);
-                blend_controllers_node->mChildren = new aiNode *[blend_controllers_node->mNumChildren];
+                blend_controllers_node->mChildren = new aiNode *[blend_controllers_node->mNumChildren]();
 
                 for (unsigned int j = 0; j < blend_controllers_node->mNumChildren; ++j) {
                     aiNode *blend_controller_node = blend_controllers_node->mChildren[j] = new aiNode();
@@ -1163,7 +1169,7 @@ void HL1MDLLoader::read_sequence_infos() {
             sequence_info_node_children.push_back(pEventsNode);
             pEventsNode->mParent = sequence_info_node;
             pEventsNode->mNumChildren = static_cast<unsigned int>(pseqdesc->numevents);
-            pEventsNode->mChildren = new aiNode *[pEventsNode->mNumChildren];
+            pEventsNode->mChildren = new aiNode *[pEventsNode->mNumChildren]();
 
             for (unsigned int j = 0; j < pEventsNode->mNumChildren; ++j, ++pevent) {
                 aiNode *pEvent = pEventsNode->mChildren[j] = new aiNode();
@@ -1210,7 +1216,7 @@ void HL1MDLLoader::read_attachments() {
     aiNode *attachments_node = new aiNode(AI_MDL_HL1_NODE_ATTACHMENTS);
     rootnode_children_.push_back(attachments_node);
     attachments_node->mNumChildren = static_cast<unsigned int>(header_->numattachments);
-    attachments_node->mChildren = new aiNode *[attachments_node->mNumChildren];
+    attachments_node->mChildren = new aiNode *[attachments_node->mNumChildren]();
 
     for (int i = 0; i < header_->numattachments; ++i, ++pattach) {
         aiNode *attachment_node = attachments_node->mChildren[i] = new aiNode();
@@ -1234,7 +1240,7 @@ void HL1MDLLoader::read_hitboxes() {
     aiNode *hitboxes_node = new aiNode(AI_MDL_HL1_NODE_HITBOXES);
     rootnode_children_.push_back(hitboxes_node);
     hitboxes_node->mNumChildren = static_cast<unsigned int>(header_->numhitboxes);
-    hitboxes_node->mChildren = new aiNode *[hitboxes_node->mNumChildren];
+    hitboxes_node->mChildren = new aiNode *[hitboxes_node->mNumChildren]();
 
     for (int i = 0; i < header_->numhitboxes; ++i, ++phitbox) {
         aiNode *hitbox_node = hitboxes_node->mChildren[i] = new aiNode();
@@ -1263,7 +1269,7 @@ void HL1MDLLoader::read_bone_controllers() {
     aiNode *bones_controller_node = new aiNode(AI_MDL_HL1_NODE_BONE_CONTROLLERS);
     rootnode_children_.push_back(bones_controller_node);
     bones_controller_node->mNumChildren = static_cast<unsigned int>(header_->numbonecontrollers);
-    bones_controller_node->mChildren = new aiNode *[bones_controller_node->mNumChildren];
+    bones_controller_node->mChildren = new aiNode *[bones_controller_node->mNumChildren]();
 
     for (int i = 0; i < header_->numbonecontrollers; ++i, ++pbonecontroller) {
         aiNode *bone_controller_node = bones_controller_node->mChildren[i] = new aiNode();
